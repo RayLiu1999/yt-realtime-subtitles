@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YT 即時翻譯字幕</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <!-- 頂部標題 -->
+    <header class="header">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="#ff4444">
+          <path
+            d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12z"
+          />
+          <path
+            d="M6 10h2v2H6zm0 4h8v2H6zm10-4h2v2h-2zm-6 0h4v2h-4zm6 4h2v2h-2z"
+          />
+        </svg>
+      </div>
+      <h1>即時翻譯字幕</h1>
+    </header>
+
+    <!-- 分頁切換 -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="history">歷史紀錄</button>
+      <button class="tab-btn" data-tab="settings">設定</button>
+    </nav>
+
+    <!-- 歷史紀錄分頁 -->
+    <section id="tab-history" class="tab-content active">
+      <div class="search-bar">
+        <input type="text" id="history-search" placeholder="搜尋影片名稱..." />
+      </div>
+      <div id="history-list" class="history-list">
+        <div class="empty-state">尚無字幕紀錄</div>
+      </div>
+      <div class="actions">
+        <button id="export-btn" class="action-btn">匯出 JSON</button>
+        <button id="clear-btn" class="action-btn action-btn-danger">
+          清除全部
+        </button>
+      </div>
+    </section>
+
+    <!-- 設定分頁 -->
+    <section id="tab-settings" class="tab-content">
+      <div class="setting-group">
+        <label for="setting-source-lang">預設來源語言</label>
+        <select id="setting-source-lang"></select>
+      </div>
+      <div class="setting-group">
+        <label for="setting-target-lang">預設目標語言</label>
+        <select id="setting-target-lang"></select>
+      </div>
+      <div class="setting-group">
+        <label for="setting-server-url">後端伺服器</label>
+        <input
+          type="text"
+          id="setting-server-url"
+          placeholder="ws://localhost:8080/ws"
+        />
+      </div>
+      <button id="save-settings-btn" class="action-btn action-btn-primary">
+        儲存設定
+      </button>
+      <div id="settings-status" class="settings-status"></div>
+    </section>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,184 @@
+/* ========================================
+   YouTube 即時翻譯字幕 - 樣式表
+   包含：控制按鈕、設定面板、懸浮字幕
+   ======================================== */
+
+/* ========== 控制按鈕 ========== */
+
+.yt-subtitle-control {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.yt-subtitle-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.9;
+  transition: opacity 0.2s ease;
+}
+
+.yt-subtitle-toggle-btn:hover {
+  opacity: 1;
+}
+
+.yt-subtitle-toggle-btn.yt-subtitle-active {
+  opacity: 1;
+}
+
+.yt-subtitle-toggle-btn.yt-subtitle-active svg {
+  filter: drop-shadow(0 0 4px rgba(255, 68, 68, 0.6));
+}
+
+.yt-subtitle-settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.yt-subtitle-settings-btn:hover {
+  opacity: 1;
+}
+
+/* ========== 設定面板 ========== */
+
+.yt-subtitle-settings-panel {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  position: absolute;
+  bottom: 56px;
+  right: 0;
+  width: 240px;
+  padding: 14px;
+  background: rgba(28, 28, 28, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  z-index: 9999;
+  font-family: "Segoe UI", "Roboto", "Noto Sans TC", sans-serif;
+}
+
+.yt-subtitle-setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.yt-subtitle-setting-group label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.yt-subtitle-setting-group select,
+.yt-subtitle-setting-group input {
+  width: 100%;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.yt-subtitle-setting-group select:focus,
+.yt-subtitle-setting-group input:focus {
+  border-color: rgba(255, 68, 68, 0.5);
+}
+
+.yt-subtitle-setting-group select option {
+  background: #1c1c1c;
+  color: #fff;
+}
+
+/* ========== 懸浮字幕覆蓋層 ========== */
+
+.yt-subtitle-overlay {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80%;
+  min-width: 200px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+  z-index: 9998;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+  transition: opacity 0.3s ease;
+  font-family: "Segoe UI", "Roboto", "Noto Sans TC", sans-serif;
+}
+
+.yt-subtitle-overlay:empty {
+  display: none;
+}
+
+/* ========== 字幕行 ========== */
+
+.yt-subtitle-line {
+  text-align: center;
+  line-height: 1.5;
+  padding: 2px 0;
+  animation: yt-subtitle-fade-in 0.3s ease-out;
+}
+
+.yt-subtitle-final {
+  font-size: 18px;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.yt-subtitle-interim {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.55);
+  font-style: italic;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.yt-subtitle-error {
+  font-size: 14px;
+  color: #ff6b6b;
+  background: rgba(255, 0, 0, 0.1);
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-top: 4px;
+  animation: yt-subtitle-fade-in 0.3s ease-out;
+}
+
+/* ========== 動畫 ========== */
+
+@keyframes yt-subtitle-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
