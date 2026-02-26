@@ -20,8 +20,8 @@
 
   // 支援的語言清單
   const LANGUAGES = [
-    { code: "en", name: "English" },
     { code: "ja", name: "日本語" },
+    { code: "en", name: "English" },
     { code: "ko", name: "한국어" },
     { code: "zh-TW", name: "繁體中文" },
     { code: "zh-CN", name: "简体中文" },
@@ -114,7 +114,7 @@
       const opt = document.createElement("option");
       opt.value = lang.code;
       opt.textContent = lang.name;
-      if (lang.code === "en") opt.selected = true;
+      if (lang.code === "ja") opt.selected = true;
       sourceSelect.appendChild(opt);
     });
     sourceGroup.appendChild(sourceSelect);
@@ -335,9 +335,18 @@
           this.mediaElementSource = this.audioContext.createMediaElementSource(
             this.videoElement,
           );
+          console.log(
+            "[YT字幕] createMediaElementSource 成功，音源節點建立完成",
+          );
         } catch (e) {
-          console.warn("[YT字幕] 媒體源已綁定過，重複使用現有節點。");
+          console.error(
+            "[YT字幕] createMediaElementSource 失敗:",
+            e.name,
+            e.message,
+          );
         }
+      } else {
+        console.log("[YT字幕] 重復使用現有媒體源節點");
       }
 
       // 如果先前已經存在節點，為了安全重置連接
@@ -379,10 +388,33 @@
         // C. 處理器必須連接到 destination 才會運作，但為了不發出聲音，中間過濾一層靜音節點
         this.processor.connect(this.dummyGain);
         this.dummyGain.connect(this.audioContext.destination);
+        console.log(
+          `[YT字幕] 音訊路由連接完成， AudioContext 狀態: ${this.audioContext.state}, 取樣率: ${this.audioContext.sampleRate}Hz`,
+        );
+      } else {
+        console.error("[YT字幕] 媒體源節點為 null！音訊路由建立失敗");
       }
 
       // === 音訊處理邏輯 ===
+      let _processCallCount = 0;
+      let _sentPacketCount = 0;
       this.processor.onaudioprocess = (event) => {
+        _processCallCount++;
+
+        // 前 5 次就輸出狀態，方便確認 each frame 是否正常觸發
+        if (_processCallCount <= 5) {
+          const wsState = this.websocket?.readyState ?? "null";
+          const stateMap = {
+            0: "CONNECTING",
+            1: "OPEN",
+            2: "CLOSING",
+            3: "CLOSED",
+          };
+          console.log(
+            `[YT字幕] onaudioprocess #${_processCallCount}, isActive=${this.isActive}, WS=${stateMap[wsState] ?? wsState}`,
+          );
+        }
+
         if (
           !this.isActive ||
           !this.websocket ||
@@ -411,6 +443,12 @@
             // 必須複製一份再送出，避免底層覆寫問題
             const chunkToSend = new Int16Array(this.audioBuffer);
             this.websocket.send(chunkToSend.buffer);
+            _sentPacketCount++;
+            if (_sentPacketCount <= 3 || _sentPacketCount % 20 === 0) {
+              console.log(
+                `[YT字幕] 已傳送音訊封包 #${_sentPacketCount} (${chunkToSend.byteLength} bytes)`,
+              );
+            }
 
             this.bufferOffset = 0; // 重置指標
           }
