@@ -93,14 +93,26 @@
 .yt-subtitle-setting-group select,
 .yt-subtitle-setting-group input {
   width: 100%;
-  padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  padding: 8px 30px 8px 10px; /* 右側留空給箭頭 */
+  background-color: rgba(255, 255, 255, 0.06);
+  background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" width="16" height="16" fill="%23ffffff" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
   color: #fff;
   font-size: 13px;
   outline: none;
-  transition: border-color 0.2s ease;
+  cursor: pointer;
+  appearance: none; /* 移除瀏覽器預設箭頭 */
+  -webkit-appearance: none;
+  transition: all 0.2s ease;
+}
+
+.yt-subtitle-setting-group select:hover,
+.yt-subtitle-setting-group input:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .yt-subtitle-setting-group select:focus,
