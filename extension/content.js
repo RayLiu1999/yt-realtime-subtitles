@@ -35,9 +35,7 @@
   // ========== 狀態管理 ==========
   let isActive = false;
   let websocket = null;
-  let audioContext = null;
-  let mediaSource = null;
-  let scriptProcessor = null;
+  let audioStreamer = null;
   let subtitleContainer = null;
   let subtitleLines = [];
   let currentInterimText = "";
@@ -220,7 +218,15 @@
       connectWebSocket(sourceLang, targetLang);
 
       // 擷取音訊
-      await captureAudio();
+      const video = document.querySelector("video");
+      if (!video) throw new Error("找不到影片元素");
+
+      if (!audioStreamer) {
+        audioStreamer = new AudioStreamer(video, websocket);
+      } else {
+        audioStreamer.websocket = websocket;
+      }
+      await audioStreamer.setupAudioCapture();
 
       isActive = true;
       historyEntries = [];
@@ -246,24 +252,15 @@
   function stopSubtitle() {
     isActive = false;
 
+    // 關閉音訊處理
+    if (audioStreamer) {
+      audioStreamer.stopCapture();
+    }
+
     // 關閉 WebSocket
     if (websocket) {
       websocket.close();
       websocket = null;
-    }
-
-    // 關閉音訊處理
-    if (scriptProcessor) {
-      scriptProcessor.disconnect();
-      scriptProcessor = null;
-    }
-    if (mediaSource) {
-      mediaSource.disconnect();
-      mediaSource = null;
-    }
-    if (audioContext) {
-      audioContext.close();
-      audioContext = null;
     }
 
     // 儲存歷史紀錄
@@ -291,56 +288,180 @@
     }
   }
 
-  // ========== 音訊擷取 ==========
+  // ========== 音訊擷取 (AudioStreamer) ==========
 
-  /**
-   * 擷取 YouTube <video> 標籤的音訊
-   * 使用 AudioContext.createMediaElementSource 取得音訊串流
-   */
-  async function captureAudio() {
-    const video = document.querySelector("video");
-    if (!video) {
-      throw new Error("找不到影片元素");
+  class AudioStreamer {
+    constructor(videoElement, websocket) {
+      this.videoElement = videoElement;
+      this.websocket = websocket;
+      this.isActive = false;
+
+      // Web Audio API 相關節點
+      this.audioContext = null;
+      this.mediaElementSource = null;
+      this.processor = null;
+      this.dummyGain = null;
+
+      // 緩衝區設計 (取代 Array.push 以提升效能)
+      this.targetSampleRate = AUDIO_SAMPLE_RATE;
+      this.bufferSize = this.targetSampleRate * 0.5; // 0.5 秒發送一次 (8000 samples)
+      this.audioBuffer = new Int16Array(this.bufferSize);
+      this.bufferOffset = 0;
+
+      this.lastAudioTime = Date.now();
+      this.heartbeatTimer = null;
     }
 
-    audioContext = new AudioContext({ sampleRate: AUDIO_SAMPLE_RATE });
+    async setupAudioCapture() {
+      this.isActive = true;
 
-    // 從 video 元素建立音源節點
-    mediaSource = audioContext.createMediaElementSource(video);
+      // 1. 初始化 AudioContext (鎖定 16kHz)
+      if (!this.audioContext) {
+        this.audioContext = new (
+          window.AudioContext || window.webkitAudioContext
+        )({
+          sampleRate: this.targetSampleRate,
+        });
+      }
 
-    // 建立 ScriptProcessor 節點用於取得 PCM 音訊資料
-    scriptProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+      if (this.audioContext.state === "suspended") {
+        await this.audioContext.resume();
+      }
 
-    scriptProcessor.onaudioprocess = (event) => {
-      if (!isActive || !websocket || websocket.readyState !== WebSocket.OPEN)
-        return;
+      // 2. 建立媒體源 (防呆機制：確保一個 video 只綁定一次)
+      if (!this.mediaElementSource) {
+        try {
+          this.mediaElementSource = this.audioContext.createMediaElementSource(
+            this.videoElement,
+          );
+        } catch (e) {
+          console.warn("[YT字幕] 媒體源已綁定過，重複使用現有節點。");
+        }
+      }
 
-      // 取得單聲道 PCM 資料（Float32Array）
-      const inputData = event.inputBuffer.getChannelData(0);
+      // 如果先前已經存在節點，為了安全重置連接
+      if (this.mediaElementSource) {
+        try {
+          this.mediaElementSource.disconnect();
+        } catch (e) {}
+      }
+      if (this.processor) {
+        try {
+          this.processor.disconnect();
+        } catch (e) {}
+      }
+      if (this.dummyGain) {
+        try {
+          this.dummyGain.disconnect();
+        } catch (e) {}
+      }
 
-      // 轉換為 16-bit Linear PCM（Deepgram 要求的格式）
-      const pcm16 = float32ToInt16(inputData);
+      // 3. 建立音訊處理節點 (BufferSize 4096)
+      if (!this.processor) {
+        this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+      }
 
-      // 傳送至後端
-      websocket.send(pcm16.buffer);
-    };
+      // 4. 建立靜音節點 (避免回音與爆音的關鍵)
+      if (!this.dummyGain) {
+        this.dummyGain = this.audioContext.createGain();
+        this.dummyGain.gain.value = 0; // 音量設為 0
+      }
 
-    // 連接音訊處理鏈：video → scriptProcessor → destination
-    // 必須連接到 destination 才能讓使用者聽到聲音
-    mediaSource.connect(scriptProcessor);
-    scriptProcessor.connect(audioContext.destination);
-  }
+      // === 音訊路由設計 (Audio Routing) ===
+      if (this.mediaElementSource) {
+        // A. 將原始聲音傳送到揚聲器 (使用者正常聽影片)
+        this.mediaElementSource.connect(this.audioContext.destination);
 
-  /**
-   * 將 Float32 PCM 轉換為 Int16 PCM
-   */
-  function float32ToInt16(float32Array) {
-    const int16Array = new Int16Array(float32Array.length);
-    for (let i = 0; i < float32Array.length; i++) {
-      const s = Math.max(-1, Math.min(1, float32Array[i]));
-      int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        // B. 將聲音分流到我們的處理器 (擷取音訊)
+        this.mediaElementSource.connect(this.processor);
+
+        // C. 處理器必須連接到 destination 才會運作，但為了不發出聲音，中間過濾一層靜音節點
+        this.processor.connect(this.dummyGain);
+        this.dummyGain.connect(this.audioContext.destination);
+      }
+
+      // === 音訊處理邏輯 ===
+      this.processor.onaudioprocess = (event) => {
+        if (
+          !this.isActive ||
+          !this.websocket ||
+          this.websocket.readyState !== WebSocket.OPEN
+        ) {
+          return;
+        }
+
+        const inputData = event.inputBuffer.getChannelData(0);
+        let hasAudio = false;
+
+        // 遍歷當下這批 Float32 音訊資料
+        for (let i = 0; i < inputData.length; i++) {
+          // 檢查是否有聲音 (振幅 > 0.001)
+          if (Math.abs(inputData[i]) > 0.001) {
+            hasAudio = true;
+          }
+
+          // Float32 轉 Int16
+          const sample = Math.max(-1, Math.min(1, inputData[i]));
+          this.audioBuffer[this.bufferOffset] = Math.floor(sample * 32767);
+          this.bufferOffset++;
+
+          // 當緩衝區滿了 (0.5秒)，就送出並重置指標
+          if (this.bufferOffset >= this.bufferSize) {
+            // 必須複製一份再送出，避免底層覆寫問題
+            const chunkToSend = new Int16Array(this.audioBuffer);
+            this.websocket.send(chunkToSend.buffer);
+
+            this.bufferOffset = 0; // 重置指標
+          }
+        }
+
+        if (hasAudio) {
+          this.lastAudioTime = Date.now();
+        }
+      };
+
+      // 5. 啟動靜音心跳機制 (防斷線)
+      this.startHeartbeat();
+
+      console.log("[YT字幕] 音訊捕獲設置完成，準備傳送串流至後端");
     }
-    return int16Array;
+
+    startHeartbeat() {
+      this.stopHeartbeat(); // 確保不重複啟動
+      this.heartbeatTimer = setInterval(() => {
+        if (!this.isActive) return;
+
+        const now = Date.now();
+        // 如果 2 秒內沒有音訊，送出一小段靜音 (0.1秒)
+        if (now - this.lastAudioTime > 2000) {
+          const silenceChunk = new Int16Array(this.targetSampleRate * 0.1); // 全為 0 的陣列
+          if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+            this.websocket.send(silenceChunk.buffer);
+          }
+          this.lastAudioTime = now;
+        }
+      }, 1000);
+    }
+
+    stopCapture() {
+      this.isActive = false;
+      this.stopHeartbeat();
+
+      // 安全地斷開連接，避免資源洩漏
+      if (this.processor) {
+        this.processor.onaudioprocess = null;
+      }
+
+      this.bufferOffset = 0;
+      console.log("[YT字幕] 音訊捕獲已暫停");
+    }
+
+    stopHeartbeat() {
+      if (this.heartbeatTimer) {
+        clearInterval(this.heartbeatTimer);
+        this.heartbeatTimer = null;
+      }
+    }
   }
 
   // ========== WebSocket 通訊 ==========
