@@ -20,9 +20,10 @@ type clientConfig struct {
 
 // subtitleResponse 定義回傳給前端的字幕資料
 type subtitleResponse struct {
-	Type    string `json:"type"`              // "transcript" | "translation" | "error"
-	Text    string `json:"text,omitempty"`    // 辨識或翻譯後的文字
-	Message string `json:"message,omitempty"` // 錯誤描述
+	Type     string `json:"type"`               // "transcript" | "translation" | "error"
+	Text     string `json:"text,omitempty"`     // 辨識或翻譯後的文字
+	Original string `json:"original,omitempty"` // 翻譯前的原始文字
+	Message  string `json:"message,omitempty"`  // 錯誤描述
 }
 
 // upgrader 設定 WebSocket 升級器，允許所有來源（Chrome Extension）
@@ -74,24 +75,33 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 
 		// 設定收到辨識結果時的處理邏輯
 		dgClient.SetOnResult(func(transcript string, isFinal bool) {
+			if isFinal {
+				log.Printf("[STT] 最終辨識: %q", transcript)
+			} else {
+				log.Printf("[STT] 中間辨識: %q", transcript)
+			}
+
 			// 先回傳辨識原文
 			sendJSON(conn, subtitleResponse{
 				Type: "transcript",
 				Text: transcript,
 			})
 
-			// 只對最終結果進行翻譯（避免對中間結果頻繁呼叫翻譯 API）
+			// 只對最終結果進行翻譯
 			if isFinal {
 				translated, err := translator.Translate(transcript, clientCfg.SourceLanguage, clientCfg.TargetLanguage)
 				if err != nil {
-					log.Printf("翻譯失敗: %v", err)
+					log.Printf("[翻譯] 失敗: %v", err)
 					sendError(conn, "翻譯失敗: "+err.Error())
 					return
 				}
 
+				log.Printf("[翻譯] %q -> %q", transcript, translated)
+
 				sendJSON(conn, subtitleResponse{
-					Type: "translation",
-					Text: translated,
+					Type:     "translation",
+					Text:     translated,
+					Original: transcript,
 				})
 			}
 		})
@@ -106,6 +116,7 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 		log.Println("開始接收音訊串流...")
 
 		// 持續接收前端的音訊二進位資料並轉發至 Deepgram
+		audioPacketCount := 0
 		for {
 			msgType, audioData, err := conn.ReadMessage()
 			if err != nil {
@@ -119,6 +130,10 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 
 			// 只處理二進位訊息（音訊資料）
 			if msgType == websocket.BinaryMessage {
+				audioPacketCount++
+				if audioPacketCount%50 == 0 {
+					log.Printf("[音訊] 已接收 %d 個封包 (%d bytes/包)", audioPacketCount, len(audioData))
+				}
 				if err := dgClient.Send(audioData); err != nil {
 					log.Printf("轉發音訊至 Deepgram 失敗: %v", err)
 					sendError(conn, "音訊處理失敗")

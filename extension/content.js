@@ -37,7 +37,8 @@
   let websocket = null;
   let audioStreamer = null;
   let subtitleContainer = null;
-  let subtitleLines = [];
+  let subtitleLines = []; // [已確認翻譯行]
+  let subtitleTimers = []; // 對應每行的自動清除計時器
   let currentInterimText = "";
   let historyEntries = [];
   let serverUrl = DEFAULT_SERVER_URL;
@@ -526,6 +527,9 @@
 
       case "translation":
         // 最終翻譯結果
+        console.log(
+          `[YT字幕] 翻譯結果: "${data.text}" (${data.original ? "原文: " + data.original : "無原文"})`,
+        );
         addSubtitleLine(data.text);
         currentInterimText = "";
 
@@ -535,6 +539,9 @@
           translated: data.text,
           time: new Date().toISOString(),
         });
+        console.log(
+          `[YT字幕] 歷史紀錄新增，目前共 ${historyEntries.length} 筆`,
+        );
         break;
 
       case "error":
@@ -559,17 +566,26 @@
     subtitleContainer.id = "yt-subtitle-overlay";
     subtitleContainer.className = "yt-subtitle-overlay";
 
+    // 字幕寬度跟隨播放器（取 80% 但限制最寬 900px）
+    const playerWidth = player.clientWidth;
+    subtitleContainer.style.maxWidth = Math.min(playerWidth * 0.8, 900) + "px";
+
     // 使字幕可拖曳
     makeDraggable(subtitleContainer);
 
     player.appendChild(subtitleContainer);
     subtitleLines = [];
+    subtitleTimers = [];
   }
 
   /**
    * 移除字幕覆蓋層
    */
   function removeSubtitleOverlay() {
+    // 清除所有字幕計時器
+    subtitleTimers.forEach((t) => clearTimeout(t));
+    subtitleTimers = [];
+
     const existing = document.getElementById("yt-subtitle-overlay");
     if (existing) {
       existing.remove();
@@ -579,14 +595,33 @@
   }
 
   /**
-   * 新增一行字幕
+   * 新增一行字幕，並設定自動清除計時器
    */
   function addSubtitleLine(text) {
-    subtitleLines.push(text);
+    const DISPLAY_DURATION_MS = 5000; // 每行字幕顯示 5 秒
 
-    // 保留最新的 N 行
+    subtitleLines.push(text);
+    subtitleTimers.push(null); // 占位符
+
+    const index = subtitleLines.length - 1;
+
+    // 設定計時器，到期移除對應行
+    const timer = setTimeout(() => {
+      const pos = subtitleLines.indexOf(text);
+      if (pos !== -1) {
+        subtitleLines.splice(pos, 1);
+        subtitleTimers.splice(pos, 1);
+        updateSubtitleDisplay();
+      }
+    }, DISPLAY_DURATION_MS);
+
+    subtitleTimers[index] = timer;
+
+    // 保留最新的 N 行（防守上限）
     if (subtitleLines.length > MAX_SUBTITLE_LINES) {
+      clearTimeout(subtitleTimers[0]);
       subtitleLines.shift();
+      subtitleTimers.shift();
     }
 
     updateSubtitleDisplay();
@@ -691,7 +726,10 @@
    * 儲存字幕歷史紀錄至 chrome.storage.local
    */
   function saveHistory() {
-    if (historyEntries.length === 0) return;
+    if (historyEntries.length === 0) {
+      console.log("[YT字幕] 无字幕內容可儲存");
+      return;
+    }
 
     const videoId =
       new URLSearchParams(window.location.search).get("v") || "unknown";
@@ -708,6 +746,8 @@
       entries: historyEntries,
     };
 
+    console.log(`[YT字幕] 儲存歷史紀錄： ${videoTitle}`, record);
+
     chrome.storage.local.get(["subtitleHistory"], (result) => {
       const history = result.subtitleHistory || [];
       history.unshift(record);
@@ -717,7 +757,9 @@
         history.length = 100;
       }
 
-      chrome.storage.local.set({ subtitleHistory: history });
+      chrome.storage.local.set({ subtitleHistory: history }, () => {
+        console.log(`[YT字幕] 歷史儲存完成，目前共 ${history.length} 筆`);
+      });
     });
   }
 
@@ -767,33 +809,27 @@
    * 等待 YouTube 播放器載入後注入按鈕
    */
   function init() {
-    // 使用 MutationObserver 偵測播放器載入
-    const observer = new MutationObserver(() => {
+    // 方法 1：監聽 YouTube 的 yt-navigate-finish 事件（SPA 導航最對的方式）
+    document.addEventListener("yt-navigate-finish", () => {
+      console.log("[YT字幕] yt-navigate-finish 事件觸發，重新注入按鈕");
+      if (isActive) {
+        stopSubtitle();
+      }
+      // 等待播放器 DOM 渲染
+      setTimeout(() => injectControlButton(), 800);
+    });
+
+    // 方法 2： MutationObserver 作為備援（首次載入 / 事件未觸發時）
+    const initialObserver = new MutationObserver(() => {
       if (document.querySelector(".ytp-right-controls")) {
         injectControlButton();
-        observer.disconnect();
+        initialObserver.disconnect();
       }
     });
+    initialObserver.observe(document.body, { childList: true, subtree: true });
 
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // 以防已經載入，立即嘗試一次
+    // 立即嘗試一次（如果播放器已載入）
     injectControlButton();
-
-    // YouTube 使用 SPA 導航，監聽網址變更
-    let lastUrl = location.href;
-    const urlObserver = new MutationObserver(() => {
-      if (location.href !== lastUrl) {
-        lastUrl = location.href;
-        // 頁面切換時停止字幕並重新注入按鈕
-        if (isActive) {
-          stopSubtitle();
-        }
-        setTimeout(injectControlButton, 1500);
-      }
-    });
-
-    urlObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   init();
