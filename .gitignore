@@ -24,3 +24,4 @@ Thumbs.db
 
 # Chrome Extension Developer Files
 /extension/*.pem
+backend/tmp/
