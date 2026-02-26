@@ -78,32 +78,32 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 			if isFinal {
 				log.Printf("[STT] 最終辨識: %q", transcript)
 			} else {
+				// interim 結果不回傳給前端（避免字幕閃爍），只記 debug log
 				log.Printf("[STT] 中間辨識: %q", transcript)
+				return
 			}
 
-			// 先回傳辨識原文
+			// 回傳最終辨識文字
 			sendJSON(conn, subtitleResponse{
 				Type: "transcript",
 				Text: transcript,
 			})
 
-			// 只對最終結果進行翻譯
-			if isFinal {
-				translated, err := translator.Translate(transcript, clientCfg.SourceLanguage, clientCfg.TargetLanguage)
-				if err != nil {
-					log.Printf("[翻譯] 失敗: %v", err)
-					sendError(conn, "翻譯失敗: "+err.Error())
-					return
-				}
-
-				log.Printf("[翻譯] %q -> %q", transcript, translated)
-
-				sendJSON(conn, subtitleResponse{
-					Type:     "translation",
-					Text:     translated,
-					Original: transcript,
-				})
+			// 呼叫翻譯 API
+			translated, err := translator.Translate(transcript, clientCfg.SourceLanguage, clientCfg.TargetLanguage)
+			if err != nil {
+				log.Printf("[翻譯] 失敗: %v", err)
+				sendError(conn, "翻譯失敗: "+err.Error())
+				return
 			}
+
+			log.Printf("[翻譯] %q -> %q", transcript, translated)
+
+			sendJSON(conn, subtitleResponse{
+				Type:     "translation",
+				Text:     translated,
+				Original: transcript,
+			})
 		})
 
 		// 連線至 Deepgram

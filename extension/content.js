@@ -15,8 +15,8 @@
   const DEFAULT_SERVER_URL = "ws://localhost:8080/ws";
   const AUDIO_SAMPLE_RATE = 16000;
   const BUFFER_SIZE = 4096;
-  const MAX_SUBTITLE_LINES = 3;
-  const SUBTITLE_FADE_DURATION = 500; // 毫秒
+  const MAX_SUBTITLE_LINES = 1; // 一次只顯示一行，避免字幕堆疊
+  const SUBTITLE_DISPLAY_MS = 6000; // 字幕顯示 6 秒
 
   // 支援的語言清單
   const LANGUAGES = [
@@ -558,9 +558,8 @@
   function handleServerMessage(data) {
     switch (data.type) {
       case "transcript":
-        // 即時辨識結果（中間結果）
+        // 只更新內部暫存，不觸發畫面更新（避免 interim 頻繁閃爍）
         currentInterimText = data.text;
-        updateSubtitleDisplay();
         break;
 
       case "translation":
@@ -673,15 +672,10 @@
 
     let html = "";
 
-    // 已確認的翻譯行
+    // 只顯示已確認的翻譯行（不顯示 interim）
     subtitleLines.forEach((line) => {
       html += `<div class="yt-subtitle-line yt-subtitle-final">${escapeHtml(line)}</div>`;
     });
-
-    // 中間辨識結果（半透明顯示）
-    if (currentInterimText) {
-      html += `<div class="yt-subtitle-line yt-subtitle-interim">${escapeHtml(currentInterimText)}</div>`;
-    }
 
     subtitleContainer.innerHTML = html;
   }
