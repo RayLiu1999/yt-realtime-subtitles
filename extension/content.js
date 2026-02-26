@@ -16,7 +16,7 @@
   const AUDIO_SAMPLE_RATE = 16000;
   const BUFFER_SIZE = 4096;
   const MAX_SUBTITLE_LINES = 1; // 一次只顯示一行，避免字幕堆疊
-  const SUBTITLE_DISPLAY_MS = 6000; // 字幕顯示 6 秒
+  const SUBTITLE_DISPLAY_MS = 3000; // 字幕顯示 3 秒
 
   // 支援的語言清單
   const LANGUAGES = [
@@ -564,10 +564,11 @@
 
       case "translation":
         // 最終翻譯結果
-        console.log(
-          `[YT字幕] 翻譯結果: "${data.text}" (${data.original ? "原文: " + data.original : "無原文"})`,
-        );
-        addSubtitleLine(data.text);
+        console.log(`[YT字幕] 翻譯: "${data.original}" → "${data.text}"`);
+        addSubtitleLine({
+          original: data.original || "",
+          translated: data.text,
+        });
         currentInterimText = "";
 
         // 加入歷史紀錄
@@ -632,29 +633,25 @@
   }
 
   /**
-   * 新增一行字幕，並設定自動清除計時器
+   * 新增一行字幕（接受 { original, translated } 物件），并設定自動清除計時器
    */
-  function addSubtitleLine(text) {
-    const DISPLAY_DURATION_MS = 5000; // 每行字幕顯示 5 秒
-
-    subtitleLines.push(text);
-    subtitleTimers.push(null); // 占位符
+  function addSubtitleLine(entry) {
+    subtitleLines.push(entry);
+    subtitleTimers.push(null);
 
     const index = subtitleLines.length - 1;
-
-    // 設定計時器，到期移除對應行
     const timer = setTimeout(() => {
-      const pos = subtitleLines.indexOf(text);
+      const pos = subtitleLines.indexOf(entry);
       if (pos !== -1) {
         subtitleLines.splice(pos, 1);
         subtitleTimers.splice(pos, 1);
         updateSubtitleDisplay();
       }
-    }, DISPLAY_DURATION_MS);
+    }, SUBTITLE_DISPLAY_MS);
 
     subtitleTimers[index] = timer;
 
-    // 保留最新的 N 行（防守上限）
+    // 防守上限
     if (subtitleLines.length > MAX_SUBTITLE_LINES) {
       clearTimeout(subtitleTimers[0]);
       subtitleLines.shift();
@@ -673,8 +670,13 @@
     let html = "";
 
     // 只顯示已確認的翻譯行（不顯示 interim）
-    subtitleLines.forEach((line) => {
-      html += `<div class="yt-subtitle-line yt-subtitle-final">${escapeHtml(line)}</div>`;
+    subtitleLines.forEach((entry) => {
+      html += `
+        <div class="yt-subtitle-entry">
+          ${entry.original ? `<div class="yt-subtitle-original">${escapeHtml(entry.original)}</div>` : ""}
+          <div class="yt-subtitle-line yt-subtitle-final">${escapeHtml(entry.translated)}</div>
+        </div>
+      `;
     });
 
     subtitleContainer.innerHTML = html;

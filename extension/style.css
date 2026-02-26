@@ -159,11 +159,21 @@
 
 /* ========== 字幕行 ========== */
 
-.yt-subtitle-line {
-  text-align: center;
-  line-height: 1.5;
-  padding: 2px 0;
+.yt-subtitle-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
   animation: yt-subtitle-fade-in 0.3s ease-out;
+}
+
+.yt-subtitle-original {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  text-align: center;
+  line-height: 1.4;
 }
 
 .yt-subtitle-final {
