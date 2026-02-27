@@ -107,7 +107,12 @@
     // 來源語言
     const sourceGroup = document.createElement("div");
     sourceGroup.className = "yt-subtitle-setting-group";
-    sourceGroup.innerHTML = "<label>來源語言</label>";
+    const sourceLabel = document.createElement("label");
+    sourceLabel.textContent = "來源語言";
+    sourceLabel.style.marginBottom = "2px";
+    sourceLabel.style.padding = "0";
+    sourceLabel.style.lineHeight = "1";
+    sourceGroup.appendChild(sourceLabel);
     const sourceSelect = document.createElement("select");
     sourceSelect.id = "yt-subtitle-source-lang";
     LANGUAGES.forEach((lang) => {
@@ -122,7 +127,12 @@
     // 目標語言
     const targetGroup = document.createElement("div");
     targetGroup.className = "yt-subtitle-setting-group";
-    targetGroup.innerHTML = "<label>目標語言</label>";
+    const targetLabel = document.createElement("label");
+    targetLabel.textContent = "目標語言";
+    targetLabel.style.marginBottom = "2px";
+    targetLabel.style.padding = "0";
+    targetLabel.style.lineHeight = "1";
+    targetGroup.appendChild(targetLabel);
     const targetSelect = document.createElement("select");
     targetSelect.id = "yt-subtitle-target-lang";
     LANGUAGES.forEach((lang) => {
@@ -166,10 +176,10 @@
    */
   function getSvgIcon(active) {
     const color = active ? "#ff4444" : "#ffffff";
+    // 麥克風圖示，代表即時語音辨識，和旁邊的 Translate 設定按鈕做明顯區隔
     return `
       <svg viewBox="0 0 24 24" width="24" height="24" fill="${color}">
-        <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12z"/>
-        <path d="M6 10h2v2H6zm0 4h8v2H6zm10-4h2v2h-2zm-6 0h4v2h-4zm6 4h2v2h-2z"/>
+        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
       </svg>
     `;
   }

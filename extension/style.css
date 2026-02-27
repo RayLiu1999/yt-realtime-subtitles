@@ -61,7 +61,7 @@
 .yt-subtitle-settings-panel {
   display: none;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
   position: absolute;
   bottom: 56px;
   right: 0;
@@ -79,16 +79,18 @@
 .yt-subtitle-setting-group {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 3px;
   margin-bottom: 0px;
 }
 
 .yt-subtitle-setting-group label {
+  display: block;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.6);
   letter-spacing: 0.5px;
   text-transform: uppercase;
   margin-bottom: 2px;
+  line-height: 1;
 }
 
 .yt-subtitle-setting-group select,
