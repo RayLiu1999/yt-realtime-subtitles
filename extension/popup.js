@@ -15,7 +15,7 @@
     { code: "en", name: "English" },
     { code: "ko", name: "한국어" },
     { code: "zh-TW", name: "繁體中文" },
-    { code: "zh-CN", name: "简体中文" },
+    { code: "id", name: "Indonesian" },
     { code: "es", name: "Español" },
     { code: "fr", name: "Français" },
     { code: "de", name: "Deutsch" },
