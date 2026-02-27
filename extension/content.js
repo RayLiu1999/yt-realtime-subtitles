@@ -48,14 +48,17 @@
   /**
    * 在 YouTube 播放器控制列注入翻譯字幕按鈕
    */
-  function injectControlButton() {
+  /**
+   * 在 YouTube 播放器控制列注入翻譯字幕按鈕
+   */
+  function injectControlButton(settings) {
     // 避免重複注入
-    if (document.getElementById("yt-subtitle-btn")) return;
+    if (document.getElementById("yt-subtitle-btn-container")) return;
 
     const rightControls = document.querySelector(".ytp-right-controls");
     if (!rightControls) {
       // YouTube 播放器尚未載入，稍後重試
-      setTimeout(injectControlButton, 1000);
+      setTimeout(() => injectControlButton(settings), 1000);
       return;
     }
 
@@ -85,7 +88,7 @@
     settingsBtn.addEventListener("click", toggleSettingsPanel);
 
     // 設定面板
-    const panel = createSettingsPanel();
+    const panel = createSettingsPanel(settings);
 
     btnContainer.appendChild(btn);
     btnContainer.appendChild(settingsBtn);
@@ -98,7 +101,10 @@
   /**
    * 建立語言設定面板
    */
-  function createSettingsPanel() {
+  function createSettingsPanel(settings) {
+    const defaultSource = settings?.sourceLanguage || "ja";
+    const defaultTarget = settings?.targetLanguage || "zh-TW";
+
     const panel = document.createElement("div");
     panel.id = "yt-subtitle-settings-panel";
     panel.className = "yt-subtitle-settings-panel";
@@ -114,7 +120,7 @@
       const opt = document.createElement("option");
       opt.value = lang.code;
       opt.textContent = lang.name;
-      if (lang.code === "ja") opt.selected = true;
+      if (lang.code === defaultSource) opt.selected = true;
       sourceSelect.appendChild(opt);
     });
     sourceGroup.appendChild(sourceSelect);
@@ -129,25 +135,13 @@
       const opt = document.createElement("option");
       opt.value = lang.code;
       opt.textContent = lang.name;
-      if (lang.code === "zh-TW") opt.selected = true;
+      if (lang.code === defaultTarget) opt.selected = true;
       targetSelect.appendChild(opt);
     });
     targetGroup.appendChild(targetSelect);
 
-    // 伺服器位址
-    const serverGroup = document.createElement("div");
-    serverGroup.className = "yt-subtitle-setting-group";
-    serverGroup.innerHTML = "<label>伺服器</label>";
-    const serverInput = document.createElement("input");
-    serverInput.id = "yt-subtitle-server-url";
-    serverInput.type = "text";
-    serverInput.value = DEFAULT_SERVER_URL;
-    serverInput.placeholder = "ws://localhost:8080/ws";
-    serverGroup.appendChild(serverInput);
-
     panel.appendChild(sourceGroup);
     panel.appendChild(targetGroup);
-    panel.appendChild(serverGroup);
 
     // 點擊面板外部時關閉
     document.addEventListener("click", (e) => {
@@ -207,9 +201,10 @@
       document.getElementById("yt-subtitle-source-lang")?.value || "en";
     const targetLang =
       document.getElementById("yt-subtitle-target-lang")?.value || "zh-TW";
-    serverUrl =
-      document.getElementById("yt-subtitle-server-url")?.value ||
-      DEFAULT_SERVER_URL;
+
+    // 從 Popup 儲存取得最新的伺服器位址
+    const result = await chrome.storage.local.get(["subtitleSettings"]);
+    serverUrl = result.subtitleSettings?.serverUrl || DEFAULT_SERVER_URL;
 
     try {
       // 1. 初始化 AudioContext 以獲取原生取樣率，避免強制 16kHz 導致藍牙耳機降質
@@ -814,15 +809,37 @@
           const targetSelect = document.getElementById(
             "yt-subtitle-target-lang",
           );
-          const serverInput = document.getElementById("yt-subtitle-server-url");
 
           if (sourceSelect) sourceSelect.value = message.sourceLanguage || "en";
           if (targetSelect)
             targetSelect.value = message.targetLanguage || "zh-TW";
-          if (serverInput && message.serverUrl)
-            serverInput.value = message.serverUrl;
 
           startSubtitle();
+        }
+        sendResponse({ success: true });
+        break;
+
+      case "settingsUpdated":
+        // 如果 Popup 儲存了新設定，我們更新畫面 UI 選項
+        if (message.settings) {
+          const sourceSelect = document.getElementById(
+            "yt-subtitle-source-lang",
+          );
+          const targetSelect = document.getElementById(
+            "yt-subtitle-target-lang",
+          );
+          if (sourceSelect)
+            sourceSelect.value = message.settings.sourceLanguage;
+          if (targetSelect)
+            targetSelect.value = message.settings.targetLanguage;
+          serverUrl = message.settings.serverUrl || DEFAULT_SERVER_URL;
+        }
+
+        // 若系統在執行中，自動重啟連線
+        if (isActive) {
+          console.log("[YT字幕] 收到新設定，正在重新連線...");
+          stopSubtitle();
+          setTimeout(() => startSubtitle(), 500);
         }
         sendResponse({ success: true });
         break;
@@ -844,30 +861,35 @@
   // ========== 初始化 ==========
 
   /**
-   * 等待 YouTube 播放器載入後注入按鈕
+   * 等待 YouTube 播放器載入後注入按鈕並管理 SPA 生命週期
    */
   function init() {
-    // 方法 1：監聽 YouTube 的 yt-navigate-finish 事件（SPA 導航最對的方式）
+    // 監聽 YouTube SPA 的導航事件，換頁時停止舊的字幕
     document.addEventListener("yt-navigate-finish", () => {
-      console.log("[YT字幕] yt-navigate-finish 事件觸發，重新注入按鈕");
       if (isActive) {
         stopSubtitle();
       }
-      // 等待播放器 DOM 渲染
-      setTimeout(() => injectControlButton(), 800);
     });
 
-    // 方法 2： MutationObserver 作為備援（首次載入 / 事件未觸發時）
-    const initialObserver = new MutationObserver(() => {
-      if (document.querySelector(".ytp-right-controls")) {
-        injectControlButton();
-        initialObserver.disconnect();
+    // 由於 YouTube 換頁會頻繁銷毀與重建控制列 (.ytp-right-controls)
+    // 採用 setInterval 每隔一小段時間檢查一次對 SPA 應對最穩健
+    setInterval(() => {
+      const isVideoPage =
+        window.location.pathname === "/watch" ||
+        window.location.pathname.startsWith("/live");
+
+      if (!isVideoPage) return;
+
+      const rightControls = document.querySelector(".ytp-right-controls");
+      const btnContainer = document.getElementById("yt-subtitle-btn-container");
+
+      // 如果影片控制列存在，但我們的按鈕不存在（表示被 YT 刷新畫面移除了），則重新注入
+      if (rightControls && !btnContainer) {
+        chrome.storage.local.get(["subtitleSettings"], (result) => {
+          injectControlButton(result.subtitleSettings);
+        });
       }
-    });
-    initialObserver.observe(document.body, { childList: true, subtree: true });
-
-    // 立即嘗試一次（如果播放器已載入）
-    injectControlButton();
+    }, 1500);
   }
 
   init();

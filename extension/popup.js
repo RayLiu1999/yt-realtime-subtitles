@@ -107,6 +107,18 @@
       setTimeout(() => {
         status.textContent = "";
       }, 2000);
+
+      // 通知 content 腳本更新設定 (同步套用最新的 URL 與語言設定)
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0] && tabs[0].url.includes("youtube.com")) {
+          chrome.tabs
+            .sendMessage(tabs[0].id, {
+              action: "settingsUpdated",
+              settings: settings,
+            })
+            .catch(() => {}); // 忽略錯誤（如果目前頁面尚無 content script）
+        }
+      });
     });
   }
 
