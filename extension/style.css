@@ -61,7 +61,7 @@
 .yt-subtitle-settings-panel {
   display: none;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   position: absolute;
   bottom: 56px;
   right: 0;
@@ -79,7 +79,7 @@
 .yt-subtitle-setting-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .yt-subtitle-setting-group label {
