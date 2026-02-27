@@ -11,8 +11,8 @@
 
   // 支援的語言清單（與 content.js 保持一致）
   const LANGUAGES = [
-    { code: "en", name: "English" },
     { code: "ja", name: "日本語" },
+    { code: "en", name: "English" },
     { code: "ko", name: "한국어" },
     { code: "zh-TW", name: "繁體中文" },
     { code: "zh-CN", name: "简体中文" },
@@ -79,7 +79,7 @@
   function loadSettings() {
     chrome.storage.local.get(["subtitleSettings"], (result) => {
       const settings = result.subtitleSettings || {
-        sourceLanguage: "en",
+        sourceLanguage: "ja",
         targetLanguage: "zh-TW",
         serverUrl: DEFAULT_SERVER_URL,
       };

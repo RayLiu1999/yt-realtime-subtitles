@@ -93,6 +93,20 @@
 
     // 插入到控制列的最前面
     rightControls.insertBefore(btnContainer, rightControls.firstChild);
+
+    // 載入預設語言設定
+    chrome.storage.local.get(["subtitleSettings"], (result) => {
+      if (result.subtitleSettings) {
+        const sourceSelect = document.getElementById("yt-subtitle-source-lang");
+        const targetSelect = document.getElementById("yt-subtitle-target-lang");
+        if (sourceSelect && result.subtitleSettings.sourceLanguage) {
+          sourceSelect.value = result.subtitleSettings.sourceLanguage;
+        }
+        if (targetSelect && result.subtitleSettings.targetLanguage) {
+          targetSelect.value = result.subtitleSettings.targetLanguage;
+        }
+      }
+    });
   }
 
   /**
@@ -773,7 +787,7 @@
       videoTitle,
       timestamp: new Date().toISOString(),
       sourceLanguage:
-        document.getElementById("yt-subtitle-source-lang")?.value || "en",
+        document.getElementById("yt-subtitle-source-lang")?.value || "ja",
       targetLanguage:
         document.getElementById("yt-subtitle-target-lang")?.value || "zh-TW",
       entries: historyEntries,
@@ -831,6 +845,25 @@
 
       case "getStatus":
         sendResponse({ active: isActive });
+        break;
+
+      case "settingsUpdated":
+        // 當 Popup 更新預設設定時，同步更新 UI 選單（若有需要）
+        if (message.settings) {
+          const sourceSelect = document.getElementById(
+            "yt-subtitle-source-lang",
+          );
+          const targetSelect = document.getElementById(
+            "yt-subtitle-target-lang",
+          );
+          if (sourceSelect && message.settings.sourceLanguage) {
+            sourceSelect.value = message.settings.sourceLanguage;
+          }
+          if (targetSelect && message.settings.targetLanguage) {
+            targetSelect.value = message.settings.targetLanguage;
+          }
+        }
+        sendResponse({ success: true });
         break;
     }
     return true;
