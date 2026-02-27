@@ -134,20 +134,8 @@
     });
     targetGroup.appendChild(targetSelect);
 
-    // 伺服器位址
-    const serverGroup = document.createElement("div");
-    serverGroup.className = "yt-subtitle-setting-group";
-    serverGroup.innerHTML = "<label>伺服器</label>";
-    const serverInput = document.createElement("input");
-    serverInput.id = "yt-subtitle-server-url";
-    serverInput.type = "text";
-    serverInput.value = DEFAULT_SERVER_URL;
-    serverInput.placeholder = "ws://localhost:8080/ws";
-    serverGroup.appendChild(serverInput);
-
     panel.appendChild(sourceGroup);
     panel.appendChild(targetGroup);
-    panel.appendChild(serverGroup);
 
     // 點擊面板外部時關閉
     document.addEventListener("click", (e) => {
@@ -207,9 +195,10 @@
       document.getElementById("yt-subtitle-source-lang")?.value || "en";
     const targetLang =
       document.getElementById("yt-subtitle-target-lang")?.value || "zh-TW";
-    serverUrl =
-      document.getElementById("yt-subtitle-server-url")?.value ||
-      DEFAULT_SERVER_URL;
+
+    // 從 Popup 儲存取得最新的伺服器位址
+    const result = await chrome.storage.local.get(["subtitleSettings"]);
+    serverUrl = result.subtitleSettings?.serverUrl || DEFAULT_SERVER_URL;
 
     try {
       // 1. 初始化 AudioContext 以獲取原生取樣率，避免強制 16kHz 導致藍牙耳機降質
@@ -847,41 +836,27 @@
    * 等待 YouTube 播放器載入後注入按鈕
    */
   function init() {
-    // 監聽 YouTube SPA 的導航事件，換頁時停止舊的字幕
+    // 方法 1：監聽 YouTube 的 yt-navigate-finish 事件（SPA 導航最對的方式）
     document.addEventListener("yt-navigate-finish", () => {
-      console.log("[YT字幕] yt-navigate-finish 事件觸發");
+      console.log("[YT字幕] yt-navigate-finish 事件觸發，重新注入按鈕");
       if (isActive) {
         stopSubtitle();
       }
+      // 等待播放器 DOM 渲染
+      setTimeout(() => injectControlButton(), 800);
     });
 
-    // 由於 YouTube 換頁會頻繁銷毀與重建控制列 (.ytp-right-controls)，
-    // 且「初次進站 (Hard load)」時 DOM 是高度懶載入的，傳統 MutationObserver 極易失效。
-    // 採用 setInterval 每隔一小段時間檢查一次，對 YouTube 的架構最為穩健。
-    setInterval(() => {
-      const isVideoPage =
-        window.location.pathname === "/watch" ||
-        window.location.pathname.startsWith("/live");
-
-      if (!isVideoPage) return;
-
-      const rightControls = document.querySelector(".ytp-right-controls");
-      const btnContainer = document.getElementById("yt-subtitle-btn-container");
-
-      // 如果 YouTube 影片控制列存在，但我們的按鈕不存在（表示初次載入尚未注入，或被 SPA 刷新 DOM 移除了）
-      if (rightControls && !btnContainer) {
-        // 從 storage 取得可能被 user 在 popup 更動過的設定值
-        try {
-          chrome.storage.local.get(["subtitleSettings"], (result) => {
-            const settings = result.subtitleSettings;
-            injectControlButton(settings);
-          });
-        } catch (e) {
-          // 當 Extension 本身剛被重新載入或發生 context 遺失時的 fallback
-          injectControlButton();
-        }
+    // 方法 2： MutationObserver 作為備援（首次載入 / 事件未觸發時）
+    const initialObserver = new MutationObserver(() => {
+      if (document.querySelector(".ytp-right-controls")) {
+        injectControlButton();
+        initialObserver.disconnect();
       }
-    }, 1000);
+    });
+    initialObserver.observe(document.body, { childList: true, subtree: true });
+
+    // 立即嘗試一次（如果播放器已載入）
+    injectControlButton();
   }
 
   init();

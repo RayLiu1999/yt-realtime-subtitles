@@ -15,7 +15,7 @@ body {
   overflow: hidden;
   background: #0f0f0f;
   color: #e8e8e8;
-  font-family: 'Segoe UI', 'Roboto', 'Noto Sans TC', sans-serif;
+  font-family: "Segoe UI", "Roboto", "Noto Sans TC", sans-serif;
   font-size: 13px;
 }
 
@@ -267,27 +267,27 @@ body {
 /* ========== 設定 ========== */
 
 .setting-group {
-  margin-bottom: 14px;
+  margin-bottom: 20px;
 }
 
 .setting-group label {
   display: block;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .setting-group select,
 .setting-group input {
   width: 100%;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   color: #fff;
-  font-size: 13px;
+  font-size: 15px;
   outline: none;
   transition: border-color 0.2s ease;
 }
