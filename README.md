@@ -36,11 +36,21 @@ For deep dives into the technical details and setup guides, please refer to the 
 
 #### 1. Backend
 
+**Option A: Using Go (Local)**
+
 ```bash
 cd backend
 cp .env.example .env
 # Edit .env with your API Keys
 go run main.go
+```
+
+**Option B: Using Docker Compose**
+
+```bash
+cp backend/.env.example .env
+# Edit .env in the root directory with your API Keys
+docker-compose up -d
 ```
 
 #### 2. Chrome Extension
@@ -102,11 +112,21 @@ Go Backend (WebSocket Server)
 
 #### 1. 後端
 
+**選項 A: 使用 Go (本地開發)**
+
 ```bash
 cd backend
 cp .env.example .env
 # 編輯 .env 填入你的 API Keys
 go run main.go
+```
+
+**選項 B: 使用 Docker Compose (推薦)**
+
+```bash
+cp backend/.env.example .env
+# 在根目錄編輯 .env 填入你的 API Keys
+docker-compose up -d
 ```
 
 #### 2. Chrome Extension

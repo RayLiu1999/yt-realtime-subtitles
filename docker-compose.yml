@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: yt-subtitles-backend
+    ports:
+      - "${SERVER_PORT:-8080}:${SERVER_PORT:-8080}"
+    environment:
+      - SERVER_PORT=${SERVER_PORT:-8080}
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY}
+      - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY}
+      - DEEPL_API_KEY=${DEEPL_API_KEY}
+    restart: unless-stopped
+    # 建議在根目錄建立一個 `.env` 檔案供 docker-compose 讀取
+    # env_file:
+    #   - ./backend/.env
