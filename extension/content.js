@@ -348,7 +348,7 @@
           );
         }
       } else {
-        console.log("[YT字幕] 重復使用現有媒體源節點");
+        // console.log("[YT字幕] 重復使用現有媒體源節點");
       }
 
       // 如果先前已經存在節點，為了安全重置連接
@@ -390,9 +390,7 @@
         // C. 處理器必須連接到 destination 才會運作，但為了不發出聲音，中間過濾一層靜音節點
         this.processor.connect(this.dummyGain);
         this.dummyGain.connect(this.audioContext.destination);
-        console.log(
-          `[YT字幕] 音訊路由連接完成， AudioContext 狀態: ${this.audioContext.state}, 取樣率: ${this.audioContext.sampleRate}Hz`,
-        );
+        // console.log(`[YT字幕] 音訊路由連接完成...`);
       } else {
         console.error("[YT字幕] 媒體源節點為 null！音訊路由建立失敗");
       }
@@ -446,10 +444,8 @@
             const chunkToSend = new Int16Array(this.audioBuffer);
             this.websocket.send(chunkToSend.buffer);
             _sentPacketCount++;
-            if (_sentPacketCount <= 3 || _sentPacketCount % 20 === 0) {
-              console.log(
-                `[YT字幕] 已傳送音訊封包 #${_sentPacketCount} (${chunkToSend.byteLength} bytes)`,
-              );
+            if (_sentPacketCount <= 3 || _sentPacketCount % 100 === 0) {
+              // console.log(`[YT字幕] 已傳送音訊封包 #${_sentPacketCount}`);
             }
 
             this.bufferOffset = 0; // 重置指標
@@ -567,7 +563,7 @@
 
       case "translation":
         // 最終翻譯結果
-        console.log(`[YT字幕] 翻譯: "${data.original}" → "${data.text}"`);
+        // console.log(`[YT字幕] 翻譯: "${data.original}" → "${data.text}"`);
         addSubtitleLine({
           original: data.original || "",
           translated: data.text,
@@ -580,9 +576,9 @@
           translated: data.text,
           time: new Date().toISOString(),
         });
-        console.log(
-          `[YT字幕] 歷史紀錄新增，目前共 ${historyEntries.length} 筆`,
-        );
+        // console.log(
+        //   `[YT字幕] 歷史紀錄新增，目前共 ${historyEntries.length} 筆`,
+        // );
         break;
 
       case "error":
@@ -783,7 +779,7 @@
       entries: historyEntries,
     };
 
-    console.log(`[YT字幕] 儲存歷史紀錄： ${videoTitle}`, record);
+    // console.log(`[YT字幕] 儲存歷史紀錄： ${videoTitle}`, record);
 
     chrome.storage.local.get(["subtitleHistory"], (result) => {
       const history = result.subtitleHistory || [];

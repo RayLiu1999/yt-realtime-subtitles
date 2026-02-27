@@ -118,13 +118,13 @@ func (d *DeepgramClient) readResults() {
 		default:
 			_, message, err := d.conn.ReadMessage()
 			if err != nil {
-				log.Printf("讀取 Deepgram 訊息失敗: %v", err)
+				// log.Printf("讀取 Deepgram 訊息失敗: %v", err)
 				return
 			}
 
 			var result DeepgramResult
 			if err := json.Unmarshal(message, &result); err != nil {
-				log.Printf("解析 Deepgram 結果失敗: %v", err)
+				// log.Printf("解析 Deepgram 結果失敗: %v", err)
 				continue
 			}
 

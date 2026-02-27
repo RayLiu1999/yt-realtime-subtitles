@@ -47,7 +47,7 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 		}
 		defer conn.Close()
 
-		log.Println("新的 WebSocket 連線已建立")
+		//		log.Println("新的 WebSocket 連線已建立")
 
 		// 等待接收第一則設定訊息
 		_, msg, err := conn.ReadMessage()
@@ -77,10 +77,10 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 		// 設定收到辨識結果時的處理邏輯
 		dgClient.SetOnResult(func(transcript string, isFinal bool) {
 			if isFinal {
-				log.Printf("[STT] 最終辨識: %q", transcript)
+				// log.Printf("[STT] 最終辨識: %q", transcript)
 			} else {
 				// interim 結果不回傳給前端（避免字幕閃爍），只記 debug log
-				log.Printf("[STT] 中間辨識: %q", transcript)
+				// log.Printf("[STT] 中間辨識: %q", transcript)
 				return
 			}
 
@@ -93,12 +93,12 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 			// 呼叫翻譯 API
 			translated, err := translator.Translate(transcript, clientCfg.SourceLanguage, clientCfg.TargetLanguage)
 			if err != nil {
-				log.Printf("[翻譯] 失敗: %v", err)
+				// log.Printf("[翻譯] 失敗: %v", err)
 				sendError(conn, "翻譯失敗: "+err.Error())
 				return
 			}
 
-			log.Printf("[翻譯] %q -> %q", transcript, translated)
+			// log.Printf("[翻譯] %q -> %q", transcript, translated)
 
 			sendJSON(conn, subtitleResponse{
 				Type:     "translation",
@@ -122,9 +122,9 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 			msgType, audioData, err := conn.ReadMessage()
 			if err != nil {
 				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-					log.Println("WebSocket 連線正常關閉")
+					// log.Println("WebSocket 連線正常關閉")
 				} else {
-					log.Printf("讀取音訊資料失敗: %v", err)
+					// log.Printf("讀取音訊資料失敗: %v", err)
 				}
 				return
 			}
@@ -133,7 +133,7 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 			if msgType == websocket.BinaryMessage {
 				audioPacketCount++
 				if audioPacketCount%50 == 0 {
-					log.Printf("[音訊] 已接收 %d 個封包 (%d bytes/包)", audioPacketCount, len(audioData))
+					// log.Printf("[音訊] 已接收 %d 個封包 (%d bytes/包)", audioPacketCount, len(audioData))
 				}
 				if err := dgClient.Send(audioData); err != nil {
 					log.Printf("轉發音訊至 Deepgram 失敗: %v", err)
