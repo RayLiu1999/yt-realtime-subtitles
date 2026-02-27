@@ -224,11 +224,14 @@
       // 3. 連線 WebSocket（帶上取樣率）
       connectWebSocket(sourceLang, targetLang, nativeSampleRate);
 
-      // 4. 擷取音訊
       const video = document.querySelector("video");
       if (!video) throw new Error("找不到影片元素");
 
-      audioStreamer = new AudioStreamer(video, websocket, nativeSampleRate);
+      if (!audioStreamer) {
+        audioStreamer = new AudioStreamer(video, websocket, nativeSampleRate);
+      } else {
+        audioStreamer.websocket = websocket;
+      }
       await audioStreamer.setupAudioCapture();
 
       isActive = true;
