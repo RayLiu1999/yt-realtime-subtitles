@@ -16,6 +16,7 @@ type clientConfig struct {
 	Type           string `json:"type"`
 	SourceLanguage string `json:"sourceLanguage"`
 	TargetLanguage string `json:"targetLanguage"`
+	SampleRate     int    `json:"sampleRate"`
 }
 
 // subtitleResponse 定義回傳給前端的字幕資料
@@ -71,7 +72,7 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 		}
 
 		// 初始化 Deepgram 串流客戶端
-		dgClient := service.NewDeepgramClient(cfg.DeepgramAPIKey, clientCfg.SourceLanguage)
+		dgClient := service.NewDeepgramClient(cfg.DeepgramAPIKey, clientCfg.SourceLanguage, clientCfg.SampleRate)
 
 		// 設定收到辨識結果時的處理邏輯
 		dgClient.SetOnResult(func(transcript string, isFinal bool) {

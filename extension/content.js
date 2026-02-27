@@ -212,21 +212,23 @@
       DEFAULT_SERVER_URL;
 
     try {
-      // 初始化字幕顯示區
+      // 1. 初始化 AudioContext 以獲取原生取樣率，避免強制 16kHz 導致藍牙耳機降質
+      const tempAudioCtx = new (
+        window.AudioContext || window.webkitAudioContext
+      )();
+      const nativeSampleRate = tempAudioCtx.sampleRate;
+
+      // 2. 初始化字幕顯示區
       createSubtitleOverlay();
 
-      // 連線 WebSocket
-      connectWebSocket(sourceLang, targetLang);
+      // 3. 連線 WebSocket（帶上取樣率）
+      connectWebSocket(sourceLang, targetLang, nativeSampleRate);
 
-      // 擷取音訊
+      // 4. 擷取音訊
       const video = document.querySelector("video");
       if (!video) throw new Error("找不到影片元素");
 
-      if (!audioStreamer) {
-        audioStreamer = new AudioStreamer(video, websocket);
-      } else {
-        audioStreamer.websocket = websocket;
-      }
+      audioStreamer = new AudioStreamer(video, websocket, nativeSampleRate);
       await audioStreamer.setupAudioCapture();
 
       isActive = true;
@@ -292,7 +294,7 @@
   // ========== 音訊擷取 (AudioStreamer) ==========
 
   class AudioStreamer {
-    constructor(videoElement, websocket) {
+    constructor(videoElement, websocket, nativeSampleRate) {
       this.videoElement = videoElement;
       this.websocket = websocket;
       this.isActive = false;
@@ -303,9 +305,9 @@
       this.processor = null;
       this.dummyGain = null;
 
-      // 緩衝區設計 (取代 Array.push 以提升效能)
-      this.targetSampleRate = AUDIO_SAMPLE_RATE;
-      this.bufferSize = this.targetSampleRate * 0.5; // 0.5 秒發送一次 (8000 samples)
+      // 緩衝區設計 (動態適應原生取樣率)
+      this.targetSampleRate = nativeSampleRate || AUDIO_SAMPLE_RATE;
+      this.bufferSize = Math.round(this.targetSampleRate * 0.5); // 0.5 秒發送一次
       this.audioBuffer = new Int16Array(this.bufferSize);
       this.bufferOffset = 0;
 
@@ -316,13 +318,11 @@
     async setupAudioCapture() {
       this.isActive = true;
 
-      // 1. 初始化 AudioContext (鎖定 16kHz)
+      // 1. 初始化 AudioContext (不設定 sampleRate，隨 OS 原生設定以避免耳機切換模式)
       if (!this.audioContext) {
         this.audioContext = new (
           window.AudioContext || window.webkitAudioContext
-        )({
-          sampleRate: this.targetSampleRate,
-        });
+        )();
       }
 
       if (this.audioContext.state === "suspended") {
@@ -508,7 +508,7 @@
   /**
    * 建立 WebSocket 連線至後端
    */
-  function connectWebSocket(sourceLang, targetLang) {
+  function connectWebSocket(sourceLang, targetLang, sampleRate) {
     websocket = new WebSocket(serverUrl);
 
     websocket.onopen = () => {
@@ -520,6 +520,7 @@
           type: "config",
           sourceLanguage: sourceLang,
           targetLanguage: targetLang,
+          sampleRate: Math.round(sampleRate),
         }),
       );
     };

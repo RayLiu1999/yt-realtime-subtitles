@@ -23,20 +23,25 @@ type DeepgramResult struct {
 
 // DeepgramClient 管理與 Deepgram Streaming API 的 WebSocket 連線
 type DeepgramClient struct {
-	conn     *websocket.Conn
-	apiKey   string
-	language string
-	onResult func(transcript string, isFinal bool)
-	mu       sync.Mutex
-	done     chan struct{}
+	conn       *websocket.Conn
+	apiKey     string
+	language   string
+	sampleRate int
+	onResult   func(transcript string, isFinal bool)
+	mu         sync.Mutex
+	done       chan struct{}
 }
 
 // NewDeepgramClient 建立新的 Deepgram 串流客戶端
-func NewDeepgramClient(apiKey, language string) *DeepgramClient {
+func NewDeepgramClient(apiKey, language string, sampleRate int) *DeepgramClient {
+	if sampleRate == 0 {
+		sampleRate = 16000
+	}
 	return &DeepgramClient{
-		apiKey:   apiKey,
-		language: language,
-		done:     make(chan struct{}),
+		apiKey:     apiKey,
+		language:   language,
+		sampleRate: sampleRate,
+		done:       make(chan struct{}),
 	}
 }
 
@@ -47,10 +52,10 @@ func (d *DeepgramClient) SetOnResult(callback func(transcript string, isFinal bo
 
 // Connect 連線至 Deepgram Streaming API
 func (d *DeepgramClient) Connect() error {
-	// 組建 Deepgram WebSocket URL，設定語言、模型與編碼格式
+	// 組建 Deepgram WebSocket URL，設定語言、模型與編碼格式，動態代入取樣率
 	url := fmt.Sprintf(
-		"wss://api.deepgram.com/v1/listen?language=%s&model=nova-2&encoding=linear16&sample_rate=16000&channels=1&punctuate=true&interim_results=true",
-		d.language,
+		"wss://api.deepgram.com/v1/listen?language=%s&model=nova-2&encoding=linear16&sample_rate=%d&channels=1&punctuate=true&interim_results=true",
+		d.language, d.sampleRate,
 	)
 
 	header := make(map[string][]string)
