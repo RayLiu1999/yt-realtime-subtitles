@@ -267,7 +267,7 @@ body {
 /* ========== 設定 ========== */
 
 .setting-group {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .setting-group label {
@@ -276,7 +276,7 @@ body {
   color: rgba(255, 255, 255, 0.6);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .setting-group select,
