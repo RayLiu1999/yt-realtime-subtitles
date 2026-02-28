@@ -143,12 +143,9 @@
   bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
-  width: auto;
-  min-width: 300px;
   max-width: 90%;
-  min-height: 40px; /* 確保沒字時也是一個條條 */
   padding: 10px 20px;
-  background: rgba(8, 8, 8, 0.75); /* 更偏向 YouTube 的深色背景 */
+  background: rgba(8, 8, 8, 0.45); /* 降低不透明度（增加透明度），使背景變淡 */
   border-radius: 4px; /* CC 字幕通常圓角較小 */
   backdrop-filter: blur(4px);
   z-index: 9998;
@@ -163,6 +160,10 @@
   align-items: center;
   text-align: center;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.yt-subtitle-overlay:empty {
+  display: none;
 }
 
 .yt-subtitle-overlay:hover {

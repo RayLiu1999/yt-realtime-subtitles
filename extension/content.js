@@ -41,6 +41,9 @@
   let subtitleTimers = []; // 對應每行的自動清除計時器
   let currentInterimText = "";
   let historyEntries = [];
+
+  // 存儲使用者拖曳後的自訂位置，null 表示尚未拖曳過
+  let subtitlePosition = null;
   let serverUrl = DEFAULT_SERVER_URL;
 
   // ========== 控制按鈕注入 ==========
@@ -280,11 +283,9 @@
     // 關閉 WebSocket
     if (websocket) {
       websocket.close();
+      websocket.send(JSON.stringify({ type: "close" })); // 可選，告知後端
       websocket = null;
     }
-
-    // 儲存歷史紀錄
-    saveHistory();
 
     // 清除字幕顯示
     removeSubtitleOverlay();
@@ -590,19 +591,18 @@
 
       case "translation":
         // 最終翻譯結果
-        // console.log(`[YT字幕] 翻譯: "${data.original}" → "${data.text}"`);
-        addSubtitleLine({
+        const entry = {
           original: data.original || "",
           translated: data.text,
-        });
-        currentInterimText = "";
+          time: new Date().toLocaleTimeString("zh-TW", { hour12: false }), // 24小時制牆上時間
+        };
 
-        // 加入歷史紀錄
-        historyEntries.push({
-          original: data.original || "",
-          translated: data.text,
-          time: new Date().toISOString(),
-        });
+        addSubtitleLine(entry);
+
+        // 即時存入 Storage
+        upsertHistoryEntry(entry);
+
+        currentInterimText = "";
         // console.log(
         //   `[YT字幕] 歷史紀錄新增，目前共 ${historyEntries.length} 筆`,
         // );
@@ -641,14 +641,9 @@
     subtitleLines = [];
     subtitleTimers = [];
 
-    // 初始化显示一小段提示，代表已經在聽了
-    subtitleContainer.innerHTML = `
-      <div class="yt-subtitle-entry">
-        <div class="yt-subtitle-line" style="color: rgba(255,255,255,0.6); font-size: 14px; font-style: italic;">
-          等待音訊中... (可任意拖曳此處)
-        </div>
-      </div>
-    `;
+    player.appendChild(subtitleContainer);
+    subtitleLines = [];
+    subtitleTimers = [];
   }
 
   /**
@@ -715,6 +710,15 @@
     });
 
     subtitleContainer.innerHTML = html;
+
+    // 拖曳後自訂位置恢復：用中心點計算 left，確保字幕長短變化時中心點不偏移
+    if (subtitlePosition) {
+      subtitleContainer.style.transform = "none";
+      subtitleContainer.style.left =
+        subtitlePosition.centerX - subtitleContainer.offsetWidth / 2 + "px";
+      subtitleContainer.style.top = subtitlePosition.y + "px";
+      subtitleContainer.style.bottom = "auto";
+    }
   }
 
   /**
@@ -747,17 +751,16 @@
       offsetX = e.clientX - element.getBoundingClientRect().left;
       offsetY = e.clientY - element.getBoundingClientRect().top;
       element.style.cursor = "grabbing";
-      element.style.transition = "none"; // 拖曳時關閉動畫，避免延遲感
-      // 移除 transform，改由 left/top 完全控制，避免拖曳偏移
-      element.style.transform = "none";
-      element.style.left =
-        element.getBoundingClientRect().left -
-        player.getBoundingClientRect().left +
-        "px";
-      element.style.top =
-        element.getBoundingClientRect().top -
-        player.getBoundingClientRect().top +
-        "px";
+      element.style.transition = "none";
+      // 若尚未拖曳過（transform 仍生效），先將位置轉換為 left/top 座標系統
+      if (!subtitlePosition) {
+        const pr = element.parentElement.getBoundingClientRect();
+        const er = element.getBoundingClientRect();
+        element.style.transform = "none";
+        element.style.left = er.left - pr.left + "px";
+        element.style.top = er.top - pr.top + "px";
+        element.style.bottom = "auto";
+      }
     });
 
     document.addEventListener("mousemove", (e) => {
@@ -779,6 +782,10 @@
         0,
         Math.min(newY, playerRect.height - element.offsetHeight),
       );
+
+      // 儲存中心點 X，確保字幕長短改變時中心點不偏移
+      const centerX = newX + element.offsetWidth / 2;
+      subtitlePosition = { centerX, y: newY };
 
       element.style.left = newX + "px";
       element.style.top = newY + "px";
@@ -806,42 +813,55 @@
   // ========== 歷史紀錄 ==========
 
   /**
-   * 儲存字幕歷史紀錄至 chrome.storage.local
+   * 即時更新該影片的歷史紀錄 (以 videoId 為 Key 進行分組)
    */
-  function saveHistory() {
-    if (historyEntries.length === 0) {
-      console.log("[YT字幕] 无字幕內容可儲存");
-      return;
-    }
-
-    const videoId =
-      new URLSearchParams(window.location.search).get("v") || "unknown";
-    const videoTitle = document.title.replace(" - YouTube", "").trim();
-
-    const record = {
-      videoId,
-      videoTitle,
-      timestamp: new Date().toISOString(),
-      sourceLanguage:
-        document.getElementById("yt-subtitle-source-lang")?.value || "ja",
-      targetLanguage:
-        document.getElementById("yt-subtitle-target-lang")?.value || "zh-TW",
-      entries: historyEntries,
-    };
-
-    // console.log(`[YT字幕] 儲存歷史紀錄： ${videoTitle}`, record);
-
-    chrome.storage.local.get(["subtitleHistory"], (result) => {
-      const history = result.subtitleHistory || [];
-      history.unshift(record);
-
-      // 最多保留 100 筆紀錄
-      if (history.length > 100) {
-        history.length = 100;
+  function upsertHistoryEntry(entry) {
+    chrome.storage.local.get(["subtitleSettings"], (settingsResult) => {
+      const settings = settingsResult.subtitleSettings || {};
+      if (settings.historyEnabled === false) {
+        return; // 如果歷史紀錄功能被關閉，則不存入
       }
 
-      chrome.storage.local.set({ subtitleHistory: history }, () => {
-        console.log(`[YT字幕] 歷史儲存完成，目前共 ${history.length} 筆`);
+      const videoId =
+        new URLSearchParams(window.location.search).get("v") || "unknown";
+      const videoTitle = document.title.replace(" - YouTube", "").trim();
+
+      chrome.storage.local.get(["subtitleHistory"], (result) => {
+        let history = result.subtitleHistory || [];
+
+        // 尋找是否已有該影片的紀錄
+        let recordIndex = history.findIndex((item) => item.videoId === videoId);
+
+        if (recordIndex !== -1) {
+          // 更新現有紀錄
+          history[recordIndex].entries.push(entry);
+          history[recordIndex].lastUpdate = new Date().toISOString();
+          // 將最新更新的影片移到最前面
+          const updatedRecord = history.splice(recordIndex, 1)[0];
+          history.unshift(updatedRecord);
+        } else {
+          // 建立新影片紀錄
+          const newRecord = {
+            videoId,
+            videoTitle,
+            timestamp: new Date().toISOString(),
+            lastUpdate: new Date().toISOString(),
+            sourceLanguage:
+              document.getElementById("yt-subtitle-source-lang")?.value || "ja",
+            targetLanguage:
+              document.getElementById("yt-subtitle-target-lang")?.value ||
+              "zh-TW",
+            entries: [entry],
+          };
+          history.unshift(newRecord);
+        }
+
+        // 限制總紀錄筆數 (例如 50 部影片)
+        if (history.length > 50) {
+          history.pop();
+        }
+
+        chrome.storage.local.set({ subtitleHistory: history });
       });
     });
   }

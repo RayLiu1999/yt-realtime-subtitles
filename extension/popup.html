@@ -47,6 +47,13 @@
     <!-- 設定分頁 -->
     <section id="tab-settings" class="tab-content">
       <div class="setting-group">
+        <label for="setting-source-lang">啟用歷史紀錄</label>
+        <label class="switch">
+          <input type="checkbox" id="yt-subtitle-history-enabled" checked />
+          <span class="slider round"></span>
+        </label>
+      </div>
+      <div class="setting-group">
         <label for="setting-source-lang">預設來源語言</label>
         <select id="setting-source-lang"></select>
       </div>
@@ -62,14 +69,14 @@
           placeholder="ws://localhost:8080/ws"
         />
       </div>
-      <div class="setting-group">
+      <!-- <div class="setting-group">
         <label for="setting-auth-token">身分驗證 Token (選填)</label>
         <input
           type="text"
           id="setting-auth-token"
           placeholder="輸入後端設定的 Token"
         />
-      </div>
+      </div> -->
       <button id="save-settings-btn" class="action-btn action-btn-primary">
         儲存設定
       </button>

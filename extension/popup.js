@@ -24,6 +24,8 @@
   ];
 
   const DEFAULT_SERVER_URL = "ws://localhost:8080/ws";
+  const WS_TOKEN =
+    "JtfEDXi8ZAD3UYxuSXJgdkOq6u0Yhh6Z5IUVm6ZTWU9qvK8kZ3BDtoUTqP9pamOQeJEDzGUDvbjzu6RrmgRWGqsZGGvSSdRXfhgPfPHgEoxm4ThUru895c1f0oVZR7evU5qP";
 
   // ========== 初始化 ==========
 
@@ -82,8 +84,8 @@
         sourceLanguage: "ja",
         targetLanguage: "zh-TW",
         serverUrl: DEFAULT_SERVER_URL,
-        authToken:
-          "JtfEDXi8ZAD3UYxuSXJgdkOq6u0Yhh6Z5IUVm6ZTWU9qvK8kZ3BDtoUTqP9pamOQeJEDzGUDvbjzu6RrmgRWGqsZGGvSSdRXfhgPfPHgEoxm4ThUru895c1f0oVZR7evU5qP",
+        authToken: WS_TOKEN,
+        historyEnabled: true, // 預設啟用歷史紀錄
       };
 
       document.getElementById("setting-source-lang").value =
@@ -91,8 +93,10 @@
       document.getElementById("setting-target-lang").value =
         settings.targetLanguage;
       document.getElementById("setting-server-url").value = settings.serverUrl;
-      document.getElementById("setting-auth-token").value =
-        settings.authToken || "";
+      // document.getElementById("setting-auth-token").value =
+      //   settings.authToken || "";
+      document.getElementById("yt-subtitle-history-enabled").checked =
+        settings.historyEnabled;
     });
   }
 
@@ -103,7 +107,9 @@
       serverUrl:
         document.getElementById("setting-server-url").value ||
         DEFAULT_SERVER_URL,
-      authToken: document.getElementById("setting-auth-token").value,
+      // authToken: document.getElementById("setting-auth-token").value,
+      historyEnabled: document.getElementById("yt-subtitle-history-enabled")
+        .checked,
     };
 
     chrome.storage.local.set({ subtitleSettings: settings }, () => {
@@ -157,29 +163,58 @@
 
     listEl.innerHTML = filtered
       .map((item, index) => {
-        const date = new Date(item.timestamp);
-        const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, "0")}`;
+        const updateDate = new Date(item.lastUpdate || item.timestamp);
+        const dateStr = `${updateDate.getMonth() + 1}/${updateDate.getDate()} ${updateDate.getHours()}:${String(updateDate.getMinutes()).padStart(2, "0")}`;
         const entryCount = item.entries?.length || 0;
 
         return `
         <div class="history-item" data-index="${index}">
           <div class="history-item-title">${escapeHtml(item.videoTitle)}</div>
           <div class="history-item-meta">
-            <span>${dateStr}</span>
+            <span>最後更新: ${dateStr}</span>
             <span>${entryCount} 條字幕</span>
             <span class="history-item-badge">${item.sourceLanguage} → ${item.targetLanguage}</span>
+          </div>
+          <div class="history-item-delete" data-index="${index}" title="刪除此紀錄">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
           </div>
         </div>
       `;
       })
       .join("");
 
-    // 綁定點擊事件 - 查看詳情
-    listEl.querySelectorAll(".history-item").forEach((item) => {
-      item.addEventListener("click", () => {
-        const idx = parseInt(item.dataset.index);
-        showHistoryDetail(filtered[idx]);
-      });
+    // 點擊歷史項目詳情或刪除
+    listEl.addEventListener("click", (e) => {
+      const deleteBtn = e.target.closest(".history-item-delete");
+      if (deleteBtn) {
+        e.stopPropagation();
+        const index = parseInt(deleteBtn.getAttribute("data-index"));
+        deleteHistoryItem(index);
+        return;
+      }
+
+      const item = e.target.closest(".history-item");
+      if (item) {
+        const index = parseInt(item.getAttribute("data-index"));
+        showHistoryDetail(filtered[index]);
+      }
+    });
+  }
+
+  /**
+   * 刪除單個歷史紀錄
+   */
+  function deleteHistoryItem(index) {
+    chrome.storage.local.get(["subtitleHistory"], (result) => {
+      const history = result.subtitleHistory || [];
+      if (index >= 0 && index < history.length) {
+        if (confirm(`確定要刪除「${history[index].videoTitle}」的紀錄嗎？`)) {
+          history.splice(index, 1);
+          chrome.storage.local.set({ subtitleHistory: history }, () => {
+            loadHistory();
+          });
+        }
+      }
     });
   }
 
@@ -195,9 +230,14 @@
     `;
 
     if (record.entries && record.entries.length > 0) {
-      record.entries.forEach((entry) => {
+      // 顯示最新的在上面
+      const sortedEntries = [...record.entries].reverse();
+      sortedEntries.forEach((entry) => {
         html += `
           <div class="history-entry">
+            <div class="history-entry-meta">
+              <span class="history-entry-time">${entry.time || ""}</span>
+            </div>
             <div class="history-entry-original">${escapeHtml(entry.original || "")}</div>
             <div class="history-entry-translated">${escapeHtml(entry.translated)}</div>
           </div>
