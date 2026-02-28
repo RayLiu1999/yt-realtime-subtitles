@@ -10,9 +10,10 @@ import (
 // Config 儲存所有應用程式設定
 type Config struct {
 	DeepgramAPIKey      string // Deepgram 語音轉文字 API Key（必填）
-	GoogleTranslateKey  string // Google Translate API Key（選填）
-	DeepLAPIKey         string // DeepL API Key（選填）
-	ServerPort          string // HTTP 伺服器埠號
+	GoogleTranslateKey string // Google Translate API Key（選填）
+	DeepLAPIKey        string // DeepL API Key（選填）
+	ServerPort         string // HTTP 伺服器埠號
+	WSToken            string // WebSocket 身分驗證 Token（選填）
 }
 
 // Load 從 .env 檔案載入設定，並驗證必要欄位
@@ -25,6 +26,7 @@ func Load() (*Config, error) {
 		GoogleTranslateKey: os.Getenv("GOOGLE_TRANSLATE_API_KEY"),
 		DeepLAPIKey:        os.Getenv("DEEPL_API_KEY"),
 		ServerPort:         os.Getenv("SERVER_PORT"),
+		WSToken:            os.Getenv("WS_AUTH_TOKEN"),
 	}
 
 	// 預設埠號

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync/atomic"
+	"time"
 )
 
 // Translator 定義翻譯服務介面
@@ -46,27 +47,32 @@ func (rr *RoundRobinTranslator) Available() bool {
 	return len(rr.translators) > 0
 }
 
-// Translate 執行翻譯，使用 Round-Robin 策略選擇服務
-// 若當前服務失敗則自動嘗試下一個
+// Translate 執行翻譯，目前改為優先使用 Google，失敗才使用其他備援服務
 func (rr *RoundRobinTranslator) Translate(text, sourceLang, targetLang string) (string, error) {
 	if len(rr.translators) == 0 {
 		return "", fmt.Errorf("沒有可用的翻譯服務")
 	}
 
 	total := len(rr.translators)
-	idx := int(rr.counter.Add(1)-1) % total
+	// 如果同時有 Google 和 DeepL，這裡固定優先從 Google (index 0) 開始嘗試
+	// 如果只有一個服務，idx 也會是 0
+	idx := 0
 
-	// 嘗試所有翻譯服務（從當前輪到的開始）
+	// 嘗試所有翻譯服務
 	for i := 0; i < total; i++ {
 		current := (idx + i) % total
 		translator := rr.translators[current]
 
+		start := time.Now()
 		result, err := translator.Translate(text, sourceLang, targetLang)
+		duration := time.Since(start)
+
 		if err == nil {
+			log.Printf("[%s] 翻譯完成，耗時: %v", translator.Name(), duration)
 			return result, nil
 		}
 
-		log.Printf("%s 翻譯失敗: %v，嘗試下一個服務", translator.Name(), err)
+		log.Printf("[%s] 翻譯失敗: %v，耗時: %v，嘗試下一個服務", translator.Name(), err, duration)
 	}
 
 	return "", fmt.Errorf("所有翻譯服務皆失敗")
@@ -193,6 +199,7 @@ func mapToDeepLLang(lang string) string {
 		"zh":    "ZH-HANS",
 		"en":    "EN",
 		"ja":    "JA",
+		"id":    "ID",
 		"ko":    "KO",
 		"es":    "ES",
 		"fr":    "FR",

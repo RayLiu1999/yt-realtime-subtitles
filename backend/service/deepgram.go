@@ -54,7 +54,7 @@ func (d *DeepgramClient) SetOnResult(callback func(transcript string, isFinal bo
 func (d *DeepgramClient) Connect() error {
 	// 組建 Deepgram WebSocket URL，設定語言、模型與編碼格式，動態代入取樣率
 	url := fmt.Sprintf(
-		"wss://api.deepgram.com/v1/listen?language=%s&model=nova-2&encoding=linear16&sample_rate=%d&channels=1&punctuate=true&interim_results=true",
+		"wss://api.deepgram.com/v1/listen?language=%s&model=nova-2&encoding=linear16&sample_rate=%d&channels=1&punctuate=true&interim_results=true&endpointing=300",
 		d.language, d.sampleRate,
 	)
 

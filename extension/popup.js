@@ -82,6 +82,8 @@
         sourceLanguage: "ja",
         targetLanguage: "zh-TW",
         serverUrl: DEFAULT_SERVER_URL,
+        authToken:
+          "JtfEDXi8ZAD3UYxuSXJgdkOq6u0Yhh6Z5IUVm6ZTWU9qvK8kZ3BDtoUTqP9pamOQeJEDzGUDvbjzu6RrmgRWGqsZGGvSSdRXfhgPfPHgEoxm4ThUru895c1f0oVZR7evU5qP",
       };
 
       document.getElementById("setting-source-lang").value =
@@ -89,6 +91,8 @@
       document.getElementById("setting-target-lang").value =
         settings.targetLanguage;
       document.getElementById("setting-server-url").value = settings.serverUrl;
+      document.getElementById("setting-auth-token").value =
+        settings.authToken || "";
     });
   }
 
@@ -99,6 +103,7 @@
       serverUrl:
         document.getElementById("setting-server-url").value ||
         DEFAULT_SERVER_URL,
+      authToken: document.getElementById("setting-auth-token").value,
     };
 
     chrome.storage.local.set({ subtitleSettings: settings }, () => {

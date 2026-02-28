@@ -220,9 +220,10 @@
     const targetLang =
       document.getElementById("yt-subtitle-target-lang")?.value || "zh-TW";
 
-    // 從 Popup 儲存取得最新的伺服器位址
+    // 從 Popup 儲存取得最新的伺服器位址與 Token
     const result = await chrome.storage.local.get(["subtitleSettings"]);
     serverUrl = result.subtitleSettings?.serverUrl || DEFAULT_SERVER_URL;
+    const authToken = result.subtitleSettings?.authToken || "";
 
     try {
       // 1. 初始化 AudioContext 以獲取原生取樣率，避免強制 16kHz 導致藍牙耳機降質
@@ -234,8 +235,8 @@
       // 2. 初始化字幕顯示區
       createSubtitleOverlay();
 
-      // 3. 連線 WebSocket（帶上取樣率）
-      connectWebSocket(sourceLang, targetLang, nativeSampleRate);
+      // 3. 連線 WebSocket（帶上取樣率與 Token）
+      connectWebSocket(sourceLang, targetLang, nativeSampleRate, authToken);
 
       const video = document.querySelector("video");
       if (!video) throw new Error("找不到影片元素");
@@ -520,8 +521,20 @@
   /**
    * 建立 WebSocket 連線至後端
    */
-  function connectWebSocket(sourceLang, targetLang, sampleRate) {
-    websocket = new WebSocket(serverUrl);
+  function connectWebSocket(
+    sourceLang,
+    targetLang,
+    sampleRate,
+    authToken = "",
+  ) {
+    let finalUrl = serverUrl;
+    if (authToken) {
+      finalUrl +=
+        (finalUrl.includes("?") ? "&" : "?") +
+        "token=" +
+        encodeURIComponent(authToken);
+    }
+    websocket = new WebSocket(finalUrl);
 
     websocket.onopen = () => {
       console.log("[YT字幕] WebSocket 已連線");
@@ -627,6 +640,15 @@
     player.appendChild(subtitleContainer);
     subtitleLines = [];
     subtitleTimers = [];
+
+    // 初始化显示一小段提示，代表已經在聽了
+    subtitleContainer.innerHTML = `
+      <div class="yt-subtitle-entry">
+        <div class="yt-subtitle-line" style="color: rgba(255,255,255,0.6); font-size: 14px; font-style: italic;">
+          等待音訊中... (可任意拖曳此處)
+        </div>
+      </div>
+    `;
   }
 
   /**
@@ -725,6 +747,17 @@
       offsetX = e.clientX - element.getBoundingClientRect().left;
       offsetY = e.clientY - element.getBoundingClientRect().top;
       element.style.cursor = "grabbing";
+      element.style.transition = "none"; // 拖曳時關閉動畫，避免延遲感
+      // 移除 transform，改由 left/top 完全控制，避免拖曳偏移
+      element.style.transform = "none";
+      element.style.left =
+        element.getBoundingClientRect().left -
+        player.getBoundingClientRect().left +
+        "px";
+      element.style.top =
+        element.getBoundingClientRect().top -
+        player.getBoundingClientRect().top +
+        "px";
     });
 
     document.addEventListener("mousemove", (e) => {
@@ -753,8 +786,11 @@
     });
 
     document.addEventListener("mouseup", () => {
+      if (!isDragging) return;
       isDragging = false;
       element.style.cursor = "grab";
+      element.style.transition =
+        "opacity 0.3s ease, background-color 0.2s ease";
     });
   }
 

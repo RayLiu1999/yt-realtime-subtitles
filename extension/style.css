@@ -143,22 +143,30 @@
   bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 80%;
-  min-width: 200px;
-  padding: 8px 16px;
-  background: rgba(0, 0, 0, 0.75);
-  border-radius: 8px;
-  backdrop-filter: blur(6px);
+  width: auto;
+  min-width: 300px;
+  max-width: 90%;
+  min-height: 40px; /* 確保沒字時也是一個條條 */
+  padding: 10px 20px;
+  background: rgba(8, 8, 8, 0.75); /* 更偏向 YouTube 的深色背景 */
+  border-radius: 4px; /* CC 字幕通常圓角較小 */
+  backdrop-filter: blur(4px);
   z-index: 9998;
   pointer-events: auto;
   cursor: grab;
   user-select: none;
-  transition: opacity 0.3s ease;
-  font-family: "Segoe UI", "Roboto", "Noto Sans TC", sans-serif;
+  transition: opacity 0.3s ease, background-color 0.2s ease;
+  font-family: "YouTube Noto", "Roboto", "Arial", sans-serif;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
-.yt-subtitle-overlay:empty {
-  display: none;
+.yt-subtitle-overlay:hover {
+  background: rgba(8, 8, 8, 0.9);
 }
 
 /* ========== 字幕行 ========== */
