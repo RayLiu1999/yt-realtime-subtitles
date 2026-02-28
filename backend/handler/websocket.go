@@ -2,8 +2,10 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -27,12 +29,22 @@ type subtitleResponse struct {
 	Message  string `json:"message,omitempty"`  // 錯誤描述
 }
 
-// upgrader 設定 WebSocket 升級器，允許所有來源（Chrome Extension）
+// upgrader 設定 WebSocket 升級器
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // 允許 Chrome Extension 的跨域請求
+		origin := r.Header.Get("Origin")
+		// 預設拒絕所有，只允許指定的白名單
+		if origin == "" {
+			return true // 允許非瀏覽器連線 (可選，若有 API Token 保護)
+		}
+		// 允許 YouTube 來源 (Content Script 環境)
+		if origin == "https://www.youtube.com" || origin == "https://youtube.com" {
+			return true
+		}
+		log.Printf("拒絕不安全的 Origin: %s", origin)
+		return false
 	},
 }
 
@@ -67,6 +79,12 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 		var clientCfg clientConfig
 		if err := json.Unmarshal(msg, &clientCfg); err != nil || clientCfg.Type != "config" {
 			sendError(conn, "無效的設定格式，預期 type 為 'config'")
+			return
+		}
+
+		// 驗證設定參數
+		if err := validateConfig(clientCfg); err != nil {
+			sendError(conn, "設定驗證失敗: "+err.Error())
 			return
 		}
 
@@ -129,6 +147,9 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 		// 持續接收前端的音訊二進位資料並轉發至 Deepgram
 		audioPacketCount := 0
 		for {
+			// 設定讀取超時（例如 30 秒內沒收到資料就中斷）
+			conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+
 			msgType, audioData, err := conn.ReadMessage()
 			if err != nil {
 				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
@@ -145,6 +166,9 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 				if audioPacketCount%50 == 0 {
 					log.Printf("[音訊] 已接收 %d 個封包 (%d bytes/包)", audioPacketCount, len(audioData))
 				}
+
+				// 轉發至 Deepgram 也要考慮超時嗎？dgClient 內部通常有處理，
+				// 這裡主要保護 WebSocket 連線。
 				if err := dgClient.Send(audioData); err != nil {
 					log.Printf("轉發音訊至 Deepgram 失敗: %v", err)
 					sendError(conn, "音訊處理失敗")
@@ -153,6 +177,18 @@ func NewWebSocketHandler(cfg *config.Config) http.HandlerFunc {
 			}
 		}
 	}
+}
+
+// validateConfig 驗證客戶端傳來的設定
+func validateConfig(cfg clientConfig) error {
+	if cfg.SourceLanguage == "" || cfg.TargetLanguage == "" {
+		return fmt.Errorf("來源或目標語言不能為空")
+	}
+	// 簡單的採樣率檢查 (8k - 48k 是常規範圍)
+	if cfg.SampleRate < 8000 || cfg.SampleRate > 48000 {
+		return fmt.Errorf("無效的採樣率: %d (預期範圍 8000-48000)", cfg.SampleRate)
+	}
+	return nil
 }
 
 // sendJSON 傳送 JSON 格式的回應至前端
