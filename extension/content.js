@@ -283,7 +283,6 @@
     // 關閉 WebSocket
     if (websocket) {
       websocket.close();
-      websocket.send(JSON.stringify({ type: "close" })); // 可選，告知後端
       websocket = null;
     }
 
